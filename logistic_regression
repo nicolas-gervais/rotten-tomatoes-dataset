@@ -1,0 +1,451 @@
+
+# coding: utf-8
+
+import numpy as np 
+from math import exp,log
+import matplotlib as mpl
+mpl.use('TkAgg')
+import matplotlib.pyplot as plt
+import pandas as pd
+
+train = pd.read_csv('countVectorizedData.csv',index_col=False)
+test = pd.read_csv('countVectorizedData20kX20K.csv',index_col=False)
+
+
+yTrain = train['review']
+XTrain = train.drop('review',axis=1)
+yTest = test['review']
+XTest = test.drop('review',axis=1)
+XTrain.drop('Unnamed: 0',axis=1,inplace=True)
+XTest.drop('Unnamed: 0',axis=1,inplace=True)
+print("Data Loaded")
+
+
+# Remove columns where total number of occurence is smaller than minNbWords
+minNbWords = 50
+XTrain.drop([col for col, val in XTrain.sum().iteritems() if val < minNbWords], axis=1, inplace=True)
+
+
+
+class LogisticRegression2:
+	'Algorithm for supervised classification'
+
+	def __init__(self,X,y,xColNames=None,decBound=0.5,optMethod='GD',C=0.0,
+		tol=1e-3,maxIter=100,standardize=False,intercept=False,alpha=1e-10,textData=False):
+		''' Logistic regression constructor
+			X: feature vector as numpy array. Only train samples
+			y: binary or multi class labels. Only train samples
+			xColNames: Names of columns for X features
+			decBound: Decision boundary in [0,1]. Defaults to 0.5
+			optMethod: Only gradient descent for now
+			C: 1/reg term. 0 means no regularization
+			tol: When to stop optimization
+			maxIter: max nb of iterations for gd
+			standardize: Std data on z scale (mu-x)/std 
+			intercept: Accepts intercept to regression model
+			alpha: Gradient descent learning rate term
+			textData: Performs text preprocessing if necessary
+		'''
+		self.y = y
+		self.intercept=intercept        
+
+		# m: number of observations, n: nb features
+		if textData:
+			self.m = len(X)           
+			self.countVectorizer(X)
+
+		else:
+			self.m,_ = X.shape
+			self.X = X
+		# Adds bias term if necessary
+		if self.intercept:        
+			self.X = np.c_[np.ones(self.m),self.X]
+		_,self.n = self.X.shape
+
+		self.optMethod = optMethod
+		self.C = C
+		self.tol = tol
+		self.decBound = decBound
+		self.maxIter = maxIter
+		self.alpha = alpha
+		self.multiClass = False
+		self.nbClasses = 1
+
+		# Makes sure variable y is not continuous
+		self.preprocessDep()
+
+		# Feature scaling if needed
+		if standardize:
+			self.featScale()
+
+	def preprocessDep(self):
+		''' Function to make sure dependant variable is correctly encoded
+			1- Check if finite number of classes (<=10), otherwise return error msg
+			2- If classification, change to 0,1,..
+			3- If binary integers (1/2), change to 0/1
+		'''
+		uniqueVals = np.unique(self.y)
+		if len(uniqueVals) > 10:
+			return "Error too many classes for classification problem. Data may be continuous."
+		uniqueDict = dict(enumerate(uniqueVals))
+		keys= list(uniqueDict.keys())
+		vals= list(uniqueDict.values())
+
+		# Check if multi class
+		if len(keys) > 2:
+			self.multiClass = True
+			self.nbClasses = len(keys)
+
+		# Create theta matrix
+		# self.theta = np.random.rand(self.nbClasses,self.n)
+		self.theta = np.zeros((self.nbClasses,self.n))
+		# Modify y to have format as we want it
+		self.y = [keys[vals.index(i)] for i in self.y]
+
+
+	def countVectorizer(self,X,testSet=False,maxNbUniques = 200000):
+		''' Count vectorizer 
+			maxNbUniques is to take only the first n words (not ideal, but to fix memory problem)
+			NOTES: Tried this implementation (finding unique words and filling) or the implementation in the
+			report (creating a new column when we find a new unique word)
+		'''
+
+        # If not only a 1 d array, means that already vectorized
+		if len(X.shape) > 1:
+			print("Text data already vectorized")
+			if self.intercept:
+				self.xColNames =['Intercept']+ X.columns
+			else:            
+				self.xColNames =X.columns
+			self.X = np.array(X)
+			return 0
+
+		print("Starting count vectorizer")
+		# Creates a list of unique words
+		if not testSet:
+			# Joins 
+			allWords = " ".join(X.values)
+			uniqueWords = []
+			nbUniques = 0
+			# Creates a list of unique words
+			for word in allWords.split():
+				if word not in uniqueWords:
+					uniqueWords.append(word)
+					nbUniques += 1
+				if nbUniques >= maxNbUniques:
+					break
+			# Create dataframe for each words
+			print("Creating dataframe")
+			Xdf = pd.DataFrame(data=dict.fromkeys(uniqueWords,np.zeros(len(X), dtype=int)))
+		# If we want to test
+		else:
+			Xdf = pd.DataFrame(data=dict.fromkeys(self.xColNames,np.zeros(len(X), dtype=int)))
+
+		print("Starting loop")
+		# Loop through index and reviews
+		for index,row in X.iteritems():
+			if index%100 == 0:
+				print(str(index)+'/'+str(self.m))
+			# For each word
+			for word in row.split():
+				if word in uniqueWords:
+					Xdf.iloc[index][word] = 1
+
+		self.X = np.array(Xdf)
+		Xdf['review'] = self.y
+		# Xdf.to_csv('countVectorizedData5kXinf.csv')
+
+	def featScale(self):
+		''' Standardize data, based on (mu-x)/std 
+			1- Perform scaling for each row where min < -3 or max > 3
+		'''
+		self.X = (self.X-self.X.mean())/self.X.std()
+
+	def storeTheta(self,theta):
+		''' Stores theta values if read from csv or other for predictions '''
+		# Check if theta is of correct size
+		if len(theta) == len(self.theta):
+			self.theta = theta
+		else:
+			print("New theta values are of wrong size. Xi is of size "+str(n) +
+				" and theta is of size " + str(len(theta)))
+
+	def printCoefs(self,firNb=10):
+		''' Prints out regression coefficients
+			1- Check if model has been trained
+			2- Check if columns have names
+			3- Loop through coefficients and print name i: theta i
+				(first being intercept)'''
+		# NOT YET IMPLEMENTED
+		pass
+
+	def confMatrix(self,pred,real=None,plot=False):
+		''' Prints coefficient matrix, accuracy, and other metrics '''
+		# CURRENTLY ONLY COMPUTES ACCURACY
+		trainSet = False
+		if real is None:
+			real = self.y
+			trainSet = True
+		if plot:
+			self.plotConfMatrix(confMat)
+		accuracy = sum(pred==real)/len(real)
+
+		# If real is none, means we are eveluating metrics on train set
+		if trainSet:
+			print("Train set metrics:")
+			print("\tAccuracy: "+str(accuracy))
+		else:
+			print("Test set metrics:")
+			print("\tAccuracy: "+str(accuracy))
+		# return confMat
+
+	def fit(self,plotCost=False,plotConfusion=False):
+		''' Trains logistic regression model '''
+		self.plotCost = plotCost
+		self.plotConfusion = plotConfusion
+		if self.optMethod == 'GD':
+			costs = self.GD()
+		elif self.optMethod == 'BGD':
+			self.BGD()
+		else:
+			return "Invalid method name"
+		self.modelTrained = True
+		return costs
+
+
+	def plotConfMatrix(self,confMat):
+		''' Heatmap of confusion matrix '''
+		# NOT YET IMPLEMENTED
+		pass
+
+
+	def pred(self,xTest=None,textData=False):
+		''' Predicts new examples'''
+		if xTest is None:
+			xTest = self.X
+		else:
+			# Make sure same columns and order
+			if textData:
+				# Add columns not available in test
+				for col in [x for x in self.xColNames if x not in xTest.columns]:
+					xTest[col] = 0
+				# Remove columns not available in test
+				xTest = xTest[self.xColNames]
+			if self.intercept:                
+				xTest = np.c_[np.ones(xTest.shape[0]),np.array(xTest)]
+			else:
+				xTest = np.array(xTest)            
+		# IF not multiclass, we need to flatten array
+		yTestFloat = self.hypothesis(xTest,self.theta.T)
+		if not self.multiClass:
+			yTestFloat = self.hypothesis(xTest,self.theta.T)
+			preds = np.reshape(yTestFloat,len(yTestFloat))
+			preds = np.array(preds > self.decBound,dtype=int)
+		else:
+			preds = np.argmax(yTestFloat,axis=1)
+
+		return preds
+
+
+	def plotGD(self,costList):
+		'''Plots gradient descent cost values'''
+		if self.multiClass:
+			currMaxX = 0
+			currMaxY = 0
+			for classNbCosts in costList:
+				xValsGraph = [i for i in range(len(classNbCosts))]
+				costListN = [1e2 if (x==float("inf") or x>1e5) else x for x in classNbCosts]
+				if max(costListN) > currMaxY:
+					currMaxY = max(costListN)
+				if max(xValsGraph) > currMaxX:
+					currMaxX = max(xValsGraph)
+				plt.plot(xValsGraph,costListN)
+
+			# X and Y axis limits
+			plt.xlim([0,currMaxX])
+			plt.ylim([0,currMaxY*1.1])
+
+		else:
+			xValsGraph = [i for i in range(len(costList[0]))]
+			costList = [1e2 if (x==float("inf") or x>1e5) else x for x in costList[0]]
+			plt.plot(xValsGraph,costList)
+			plt.xlim([0,len(costList)])
+			plt.ylim([0.9*min(costList),max(costList)*1.1])
+		plt.xlabel('Number of iterations')
+		plt.ylabel('J (theta)')
+		plt.title('Cost value for each iteration of gradient descent\nAlpha= '+str(self.alpha)+' C= '+str(self.C))
+		plt.show()
+		return costList    
+
+
+	def hypothesis(self,x,thetaj):
+		''' Return hypothesis '''
+		return self.sigmoid(x.dot(thetaj))
+
+	def J(self,x,y,thetaj):
+		'''Logistic regression cost function'''
+		hyp = self.hypothesis(x,thetaj)
+		regCost = sum((self.C/(2.0*len(x))) * thetaj**2)
+		cost = -(1.0/len(x)) * sum(y * np.nan_to_num(np.log(hyp)) + (np.ones(len(x))-y)*np.nan_to_num(np.log(np.ones(len(x))-hyp))) + regCost
+		return cost
+
+	def sigmoid(self,z):
+		'''Logit function '''
+		return 1.0/(1.0+np.exp(-z))
+
+	def grad(self,x,y,thetaj):
+		''' Calculates value of gradient
+			Returns slope for each j
+		'''
+		gradJ = (1.0/len(y))*np.dot(x.T,self.hypothesis(x,thetaj)-y) + (self.C/len(y))*thetaj
+		# Intercept not subject to gradient descent
+		if self.intercept:
+			gradJ[0] = gradJ[0] - (self.C/self.m)*thetaj[0]
+		# print(gradJ)
+		return gradJ
+
+	def BGD(self,batchSize=1000):
+		''' Performs stochastic batch gradient descent '''
+		print("Starting Batch Gradient Descent")
+		fullCostHist = []
+		totIter = 0
+		nbBatch = int(self.m/batchSize)                
+		for classNb in range(self.nbClasses):
+			convAtMax = True
+			# Change y from [0,1,8,2,3,1] for multi class to one class binary
+			if not self.multiClass:
+				yMulticlass = self.y
+			else:
+				yMulticlass = np.array([1 if i==classNb else 0 for i in self.y])
+			print("Starting fitting for class "+str(classNb))
+
+			# Create empty list for graphs
+			costHist = [self.J(self.X,yMulticlass,self.theta[classNb])]
+			# Loop through each iteration < max iter
+			for iterNb in range(self.maxIter):
+				# Loop through each batch
+				for batch in range(nbBatch):
+					# If last batch
+					if batch == nbBatch:
+						self.theta[classNb] -= (self.alpha * self.grad(self.X[batch*batchSize:],yMulticlass[batch*batchSize:],self.theta[classNb]))                   
+						iterJ = self.J(self.X,yMulticlass,self.theta[classNb])
+					# Simul update theta
+					else:                    
+						self.theta[classNb] -= (self.alpha * self.grad(self.X[batch*batchSize:(batch+1)*batchSize],yMulticlass[batch*batchSize:(batch+1)*batchSize],self.theta[classNb]))
+						# Append to cost list
+						iterJ = self.J(self.X,yMulticlass,self.theta[classNb])
+					
+					costHist.append(iterJ)
+					changePerc = abs((costHist[-1] - costHist[-2])/costHist[-2])
+# 					print(iterNb,batch,iterJ,changePerc)
+					if changePerc == float("inf"):
+						changePerc = 1e5
+					# print(iterNb,iterJ,changePerc)
+					if changePerc < self.tol:
+						print("Converged after " + str(iterNb) + " iterations for class "+ str(classNb))
+						convAtMax = False
+						break
+				if changePerc < self.tol:
+						# print("Converged after " + str(iterNb) + " iterations for class "+ str(classNb))
+						convAtMax = False
+						break
+
+			fullCostHist.append(costHist)
+			if convAtMax: print("Stopped after " + str(self.maxIter) + " iterations for class " + str(classNb))
+
+		if self.plotCost:
+			self.plotGD(fullCostHist)
+
+
+	def GD(self):
+		'''Perform gradient descent to minimize J(theta) while change > tol or < maxIter
+		'''
+		fullCostHist = []
+		for classNb in range(self.nbClasses):
+			# Change y from [0,1,8,2,3,1] for multi class to one class binary
+			convAtMax = True
+			if not self.multiClass:
+				yMulticlass = self.y
+			else:
+				yMulticlass = np.array([1 if i==classNb else 0 for i in self.y])
+			# Empty cost history list
+			costHist = [self.J(self.X,yMulticlass,self.theta[classNb])]
+			for iterNb in range(self.maxIter):
+				# Simul update theta
+				self.theta[classNb] -= (self.alpha * self.grad(self.X,yMulticlass,self.theta[classNb]))
+				# Append to cost list
+				iterJ = self.J(self.X,yMulticlass,self.theta[classNb])
+				costHist.append(iterJ)
+				changePerc = abs((costHist[-1] - costHist[-2])/costHist[-2])
+				if changePerc == float("inf"):
+					changePerc = 1e5
+				print(iterNb,iterJ,changePerc)
+				if changePerc < self.tol and iterNb!=0:
+					print("Converged after " + str(iterNb) + " iterations for class "+ str(classNb))
+					convAtMax = False
+					break
+			fullCostHist.append(costHist)
+			if convAtMax: print("Stopped after " + str(self.maxIter) + " iterations for class " + str(classNb))
+
+		if self.plotCost:
+			costs = self.plotGD(fullCostHist)
+			return costs
+
+
+
+# For timing
+import datetime
+
+
+# startTime = datetime.datetime.now()
+# 3 different values of alpha
+lr = LogisticRegression2(XTrain,yTrain,textData=True,xColNames=XTrain.columns,
+                         maxIter=100,tol=1e-25,C=200,alpha=2e-0,intercept=False,optMethod='GD')
+costsALPHA2 = lr.fit(plotCost=True)
+
+lr2 = LogisticRegression2(XTrain,yTrain,textData=True,xColNames=XTrain.columns,
+                         maxIter=100,tol=1e-25,C=200,alpha=1e-1,intercept=False,optMethod='GD')
+costsALPHA0_1 = lr2.fit(plotCost=True)
+
+lr3 = LogisticRegression2(XTrain,yTrain,textData=True,xColNames=XTrain.columns,
+                         maxIter=100,tol=1e-25,C=200,alpha=2e1,intercept=False,optMethod='GD')
+costsALPHA20 = lr3.fit(plotCost=True)
+# endTime = datetime.datetime.now()
+# diff = endTime-startTime
+print(diff)
+
+
+# Compute predictions
+preds = lr.pred()
+# Calculate accuracy on train
+lr.confMatrix(preds)
+# Predict based on new X values
+yPred = lr.pred(xTest=XTest,textData=True)
+# Compute accuracy on test
+lr.confMatrix(yPred,real=yTest)
+
+
+# Testing with sklearn
+from sklearn.linear_model import LogisticRegression
+lrSKL = LogisticRegression(C=200,tol=1e-8,fit_intercept=False,max_iter=2000)
+startTime = datetime.datetime.now()
+lrSKL.fit(XTrain,yTrain)
+endTime = datetime.datetime.now()
+diff = endTime-startTime
+# print(diff)
+
+lrSKL.score(XTrain,yTrain)
+
+
+# Graphs
+xvals = list(range(len(costsALPHA0_1)))
+plt.plot(xvals,costsALPHA0_1)
+plt.plot(xvals,costsALPHA2)
+plt.plot(xvals,costsALPHA20)
+plt.xlabel('Number of iterations')
+plt.ylabel('J (theta)')
+plt.title('Cost value for each iteration of gradient descent\nfor various values of alpha')
+plt.legend(['Alpha=0.1','Alpha=2','Alpha=20'])
+
+plt.show()
+
