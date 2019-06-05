@@ -37,7 +37,8 @@ def movies(letter):
         checker = fetch(website, critic_profile).find_all("h2", {"class": "panel-heading js-review-type"})
         if len(checker) > 0:
             if checker[0].text == "Movie Reviews Only":
-                for td in fetch(website, critic_profile).find_all("td", {"class": "col-xs-12 col-sm-6 critic-review-table__title-column"}):
+                for td in fetch(website, critic_profile).find_all("td", 
+                                {"class": "col-xs-12 col-sm-6 critic-review-table__title-column"}):
                     for a in td.find_all("a"):
                         if a['href'] not in movies_url:
                             movies_url.append(a['href'])
@@ -82,7 +83,8 @@ for i in range(1, 18):
 def rating_review(number):
     # scrapes all the reviews and rating from the pages
     reviews = []
-    pages = pd.read_csv('C:/Users/Nicolas/Documents/RottenTomatoScraping/Final/all_movies_and_pages_' + str(number) + '.csv', header=None)
+    pages = pd.read_csv('C:/Users/Nicolas/Documents/RottenTomatoScraping/Final/all_movies_and_pages_' + str(number) + '.csv', 
+                        header=None)
     for page in pages[0]:
         soup_2 = fetch(page, "").find_all("div", {"class": "col-xs-16 review_container"})
         for comment in soup_2:
