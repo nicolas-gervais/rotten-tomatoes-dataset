@@ -3,7 +3,7 @@ from urllib.request import Request, urlopen
 import pandas as pd
 import numpy as np
 import os
-os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
+os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')  # change dir
 
 website = "https://www.rottentomatoes.com"
 alphabet = 'abcdefghijklmnopqrstuvwyz'  # do not include x
