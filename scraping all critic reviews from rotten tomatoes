@@ -2,14 +2,17 @@ import bs4 as bs
 from urllib.request import Request, urlopen
 import pandas as pd
 import numpy as np
+import itertools
 import os
-os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')  # change dir
+
+os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
 
 website = "https://www.rottentomatoes.com"
 alphabet = 'abcdefghijklmnopqrstuvwyz'  # do not include x
 
 
 def fetch(page, addition=''):
+    """Fetches HTML data"""
     headers = {'User-Agent': 'Opera/9.80 (X11; Linux i686; Ub'
                'untu/14.10) Presto/2.12.388 Version/12.16'}
     req = Request(page + addition, headers=headers)
@@ -19,7 +22,7 @@ def fetch(page, addition=''):
 
 
 def critics_letters(letters):
-    # creates url for 26 pages of critics, based on the first letter of their name
+    """Creates URL for 26 pages of critics, based on the first letter of their name"""
     letters_url = list()
     for elem in letters:
         letters_url.append("/critics/authors?letter=" + elem)
@@ -27,7 +30,7 @@ def critics_letters(letters):
 
 
 def critics_list(catalog):
-    # fetches the url of all listed critics
+    """Fetches the url of all listed critics"""
     critics_url = []
     for ix, letter_pages in enumerate(catalog, 1):
         for p in fetch(website, letter_pages).find_all("p", {"class": "critic-names"}):
@@ -35,14 +38,15 @@ def critics_list(catalog):
                 href_critic = a['href']
                 if str(href_critic)[:7] != "/source":
                     critics_url.append(href_critic + "/movies")
-        print('\r{:.2%} of the pages of movie critic URLs scraped. (step 1/4)'.format(ix / len(catalog)), end='   ')
+        print('\r1/4 — {:.2%} of movie critic URLs scraped.'.format(ix/len(catalog)), end='   ')
     print('\r{} pages of movie critic URLs successfully scraped.'.format(ix), end='  '); print()
     return critics_url
 
 
 def movies(catalog):
-    # fetches the url of the movies reviewed by the critic
+    """Fetches the url of the movies reviewed by the critic"""
     movies_url = []
+    errors = 0
     for ix, critic_profile in enumerate(catalog, 1):
         try:
             checker = fetch(website, critic_profile).find_all("h2", {"class": "panel-heading js-review-type"})
@@ -54,15 +58,17 @@ def movies(catalog):
                             if a['href'] not in movies_url:
                                 movies_url.append(a['href'])
         except:
-            pass
-        print('\r{:.2%} of movie URLs scraped. (step 2/4)'.format(ix/len(catalog)), end='   ')
-    print('\r{} movie URLs successfully scraped.'.format(ix), end='  '); print()
+            errors += 1
+        print('\r2/4 — {:.2%} of movie URLs scraped. Errors: {:,}'.format(ix/len(catalog),
+                                        errors), end='   ')
+    print('\r{} movie URLs successfully scraped.'.format(len(movies_url)-errors), end='  '); print()
     return movies_url
 
 
 def review_pages(catalog):
-    # list the pages of reviews from all movies in chunks of 1000 and exports 17 csv files
+    """List the pages of reviews from all movies in chunks of 1000 and exports 17 csv files"""
     review_pages_list = []
+    errors = 0
     for ix, movie in enumerate(catalog.iloc[:, 0]):
         # print(movie)
         try:
@@ -71,38 +77,44 @@ def review_pages(catalog):
                 for n in range(1, int(soup_2[0].text[-2:]) + 1):
                     review_pages_list.append(movie + "/reviews/?page=" + str(n))
         except:
-            print('Problem with %s.' % movie)
-        print('\r{:.2%} of review page URLs scraped. (step 3/4)'.format(ix/len(catalog)), end='   ')
-    print('\r{} review page URLs successfully scraped.'.format(ix), end='  '); print()
+            errors += 1
+        print('\r3/4 — {:.2%} of review page URLs scraped. Errors: {}'.format(ix/len(catalog),
+                                                        errors), end='   ')
+    print('\r{} review page URLs successfully scraped.'.format(len(review_pages_list)-errors), end='  '); print()
     return review_pages_list
 
 
 def rating_review(catalog):
-    # scrapes all the reviews and rating from the pages
+    """Scrapes all the reviews and rating from the pages"""
     reviews = []
+    errors = 0
     for ix, page in enumerate(catalog.iloc[:, 0], 1):
-        soup_2 = fetch(page, "").find_all("div", {"class": "col-xs-16 review_container"})
-        for comment in soup_2:
-            comment_text = comment.find_all("div", {"class": "the_review"})[0].text.strip()
-            icon = str(comment.find_all("div")[0])
-            if "fresh" in icon:
-                reviews.append('1 - ' + comment_text)
-            elif "rotten" in icon:
-                reviews.append('0 - ' + comment_text)
-        print('\r{:.2%} of reviews scraped. (step 4/4)'.format(ix / len(catalog)), end='   ')
-    print('\r{} reviews successfully scraped.'.format(ix), end='  '); print()
+        try:
+            soup_2 = fetch(page, "").find_all("div", {"class": "col-xs-16 review_container"})
+            for comment in soup_2:
+                comment_text = comment.find_all("div", {"class": "the_review"})[0].text.strip()
+                icon = str(comment.find_all("div")[0])
+                if "fresh" in icon:
+                    reviews.append('1 - ' + comment_text)
+                elif "rotten" in icon:
+                    reviews.append('0 - ' + comment_text)
+        except:
+            errors += 1
+        print('\r4/4 — {:.2%} of reviews scraped. Errors: {}'.format(ix / len(catalog),
+                                            errors), end='   ')
+    print('\r{} reviews successfully scraped.'.format(len(reviews)-errors), end='  '); print()
     return reviews
 
 
 def process_and_export(document):
-    # prepares the document and exports it to the working directory
+    """Prepares the document and exports it to the working directory"""
     df = document
     df['freshness'] = df.iloc[:, 0].str.split(' - ').str.get(0)
     df['review'] = df.iloc[:, 0].str.split(' - ').str.get(1)
     df = df.loc[df['review'].str.len() >= 18]
     df = df.loc[:, ['freshness', 'review']]
 
-    num_to_keep = (df.shape[0] - df.freshness.astype(np.int32).sum()) // 10_000 * 10_000
+    num_to_keep = (df.shape[0] - df.freshness.astype(np.int32).sum()) // 1_000 * 1_000
     rotten = df.loc[df.freshness == '0'].sample(num_to_keep)
     fresh = df.loc[df.freshness == '1'].sample(num_to_keep)
 
@@ -110,8 +122,9 @@ def process_and_export(document):
     df = df.sample(frac=1).reset_index(drop=True)
 
     df.to_csv('all_rotten_tomatoes_reviews.csv', index=False)
-    print('The web scraper has finished. \nCheck your directory: {}'.format(os.getcwd()),
-          '\nThe file with all reviews: all_rotten_tomatoes_reviews.csv'); print()
+    print('\nThe web scraper has finished.',
+          '\nCheck your directory: {}'.format(os.getcwd()),
+          '\nThe file with all reviews is named: all_rotten_tomatoes_reviews.csv')
     return df
 
 
@@ -133,4 +146,3 @@ if __name__ == '__main__':
     df = pd.read_csv('reviews.csv', header=None)
 
     final_doc = process_and_export(df)
-    
