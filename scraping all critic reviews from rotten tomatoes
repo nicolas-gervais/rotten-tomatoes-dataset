@@ -114,7 +114,7 @@ def process_and_export(document):
     df = df.loc[df['review'].str.len() >= 18]
     df = df.loc[:, ['freshness', 'review']]
 
-    num_to_keep = (df.shape[0] - df.freshness.astype(np.int32).sum()) // 1_000 * 1_000
+    num_to_keep = (df.shape[0] - df.freshness.astype(np.int32).sum()) // 10_000 * 10_000
     rotten = df.loc[df.freshness == '0'].sample(num_to_keep)
     fresh = df.loc[df.freshness == '1'].sample(num_to_keep)
 
