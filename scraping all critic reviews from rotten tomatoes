@@ -31,7 +31,7 @@ def critics_letters(letters):
 
 def critics_list(catalog):
     """Fetches the url of all listed critics"""
-    critics_url = []
+    critics_url = list()
     for ix, letter_pages in enumerate(catalog, 1):
         for p in fetch(website, letter_pages).find_all("p", {"class": "critic-names"}):
             for a in p.find_all("a"):
@@ -45,7 +45,7 @@ def critics_list(catalog):
 
 def movies(catalog):
     """Fetches the url of the movies reviewed by the critic"""
-    movies_url = []
+    movies_url = list()
     errors = 0
     for ix, critic_profile in enumerate(catalog, 1):
         try:
@@ -59,18 +59,18 @@ def movies(catalog):
                                 movies_url.append(a['href'])
         except:
             errors += 1
-        print('\r2/4 — {:.2%} of movie URLs scraped. Errors: {:,}'.format(ix/len(catalog),
-                                        errors), end='   ')
-    print('\r{} movie URLs successfully scraped.'.format(len(movies_url)-errors), end='  '); print()
+        print('\r2/4 — {:.2%} of movie URLs scraped. Error rate: {:.2%}'.format(ix/len(catalog),
+                                        errors/ix), end='   ')
+    print('\r{} movie URLs successfully scraped. Error rate: {:.2%}'.format(
+        len(movies_url)-errors, errors/ix), end='\n')
     return movies_url
 
 
 def review_pages(catalog):
     """List the pages of reviews from all movies in chunks of 1000 and exports 17 csv files"""
-    review_pages_list = []
+    review_pages_list = list()
     errors = 0
-    for ix, movie in enumerate(catalog.iloc[:, 0]):
-        # print(movie)
+    for ix, movie in enumerate(catalog.iloc[:, 0], 1):
         try:
             soup_2 = fetch(movie, "/reviews/?page=1").find_all("span", {"class", "pageInfo"})
             if len(soup_2) >= 1:
@@ -78,15 +78,16 @@ def review_pages(catalog):
                     review_pages_list.append(movie + "/reviews/?page=" + str(n))
         except:
             errors += 1
-        print('\r3/4 — {:.2%} of review page URLs scraped. Errors: {}'.format(ix/len(catalog),
-                                                        errors), end='   ')
-    print('\r{} review page URLs successfully scraped.'.format(len(review_pages_list)-errors), end='  '); print()
+        print('\r3/4 — {:.2%} of review page URLs scraped. Errors: {:,} Error rate: {:.2%}'.format(
+            ix/len(catalog), errors, errors/ix), end='    ')
+    print('\r{} review page URLs successfully scraped. Error rate: {:.2%}'.format(
+        len(review_pages_list)-errors, errors/ix), end='\n')
     return review_pages_list
 
 
 def rating_review(catalog):
     """Scrapes all the reviews and rating from the pages"""
-    reviews = []
+    reviews = list()
     errors = 0
     for ix, page in enumerate(catalog.iloc[:, 0], 1):
         try:
@@ -100,9 +101,10 @@ def rating_review(catalog):
                     reviews.append('0 - ' + comment_text)
         except:
             errors += 1
-        print('\r4/4 — {:.2%} of reviews scraped. Errors: {}'.format(ix / len(catalog),
-                                            errors), end='   ')
-    print('\r{} reviews successfully scraped.'.format(len(reviews)-errors), end='  '); print()
+        print('\r4/4 — {:.2%} of reviews scraped. Error rate: {:.2%}'.format(ix/len(catalog),
+                                            errors/ix), end='    ')
+    print('\r{} reviews successfully scraped. Error rate: {:.2%}'.format(
+        len(reviews)-errors, errors/ix), end='\n')
     return reviews
 
 
