@@ -8,7 +8,7 @@ import os
 os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
 
 website = "https://www.rottentomatoes.com"
-alphabet = 'abcdefghijklmnopqrstuvwyz'  # do not include x
+alphabet = 'abcdefghijklmnopqrstuvwyz'  # do not include x 
 
 
 def fetch(page, addition=''):
@@ -78,8 +78,8 @@ def review_pages(catalog):
                     review_pages_list.append(movie + "/reviews/?page=" + str(n))
         except:
             errors += 1
-        print('\r3/4 — {:.2%} of review page URLs scraped. Errors: {:,} Error rate: {:.2%}'.format(
-            ix/len(catalog), errors, errors/ix), end='    ')
+        print('\r3/4 — {:.2%} of review page URLs scraped. Error rate: {:.2%}'.format(
+            ix/len(catalog), errors/ix), end='    ')
     print('\r{} review page URLs successfully scraped. Error rate: {:.2%}'.format(
         len(review_pages_list)-errors, errors/ix), end='\n')
     return review_pages_list
@@ -108,7 +108,7 @@ def rating_review(catalog):
     return reviews
 
 
-def process_and_export(document):
+def process(document):
     """Prepares the document and exports it to the working directory"""
     df = document
     df['freshness'] = df.iloc[:, 0].str.split(' - ').str.get(0)
@@ -124,6 +124,7 @@ def process_and_export(document):
     df = df.sample(frac=1).reset_index(drop=True)
 
     df.to_csv('all_rotten_tomatoes_reviews.csv', index=False)
+
     print('\nThe web scraper has finished.',
           '\nCheck your directory: {}'.format(os.getcwd()),
           '\nThe file with all reviews is named: all_rotten_tomatoes_reviews.csv')
@@ -147,4 +148,4 @@ if __name__ == '__main__':
     pd.DataFrame(rating_reviews).to_csv('reviews.csv', index=False, header=None)
     df = pd.read_csv('reviews.csv', header=None)
 
-    final_doc = process_and_export(df)
+    final_doc = process(df)
