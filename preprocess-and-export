@@ -1,0 +1,40 @@
+# ----- // imports
+
+import os
+os.chdir('c:/users/nicolas/documents/data/rottentomatoes')
+import pandas as pd
+from nltk.corpus import stopwords
+
+# ----- // loading the data, changing names
+
+df = pd.read_csv('rotten_tomatoes_reviews.csv')
+
+df['Freshness'] = (df['Freshness'] == 'fresh')*1
+
+df.columns = 'target', 'text'
+
+# ----- // remove stop words
+
+df.text = df.text.str.lower()
+
+stop_words = set(stopwords.words('english'))
+df['text'] = df['text'].apply(lambda x: [i for i in x.split() if i not in stop_words])
+
+# ----- // edit negation
+
+import sys
+sys.path.append('')
+from appos import appos
+
+df.text = df.text.apply(lambda x: [appos[word] if word in appos else word for word in x])
+df.text = df.text.apply(lambda x: " ".join(x))
+
+# ----- // is alpha
+
+df.text = df.text.apply(lambda x: [word for word in x.split() if word.isalpha()])
+
+df.text = df.text.apply(lambda x: ' '.join(word for word in x if word.isalpha()))
+
+df.sample(frac=1).head(10)
+
+df.to_csv('preprocessed.csv', index=None)
