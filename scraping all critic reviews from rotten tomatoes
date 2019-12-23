@@ -19,7 +19,7 @@ import os
 os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
 
 website = "https://www.rottentomatoes.com"
-alphabet = ascii_letters[:26].replace('x', '')  # do not include x
+alphabet = ascii_letters[:26].replace('x', '')  # remove x
 
 
 def fetch(page, addition=''):
