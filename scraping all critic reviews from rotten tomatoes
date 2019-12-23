@@ -1,14 +1,25 @@
+"""
+This webscraper should work perfectly. All you need to do is
+choose your own directory in os.chdir(). If there are any
+errors while you run the code, it's most likely because
+Rotten Tomatoes keeps modifying their website structure,
+probably because they detected widespread use of this web
+scraper. If there are ANY errors while you run it, open
+an issue following these steps to notify me:
+https://help.github.com/en/github/managing-your-work-on-github/creating-an-issue
+"""
+
 import bs4 as bs
 from urllib.request import Request, urlopen
 import pandas as pd
+from string import ascii_letters
 import numpy as np
-import itertools
 import os
 
 os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
 
 website = "https://www.rottentomatoes.com"
-alphabet = 'abcdefghijklmnopqrstuvwyz'  # do not include x 
+alphabet = ascii_letters[:26].replace('x', '')  # do not include x
 
 
 def fetch(page, addition=''):
@@ -33,11 +44,10 @@ def critics_list(catalog):
     """Fetches the url of all listed critics"""
     critics_url = list()
     for ix, letter_pages in enumerate(catalog, 1):
-        for p in fetch(website, letter_pages).find_all("p", {"class": "critic-names"}):
-            for a in p.find_all("a"):
-                href_critic = a['href']
-                if str(href_critic)[:7] != "/source":
-                    critics_url.append(href_critic + "/movies")
+        for a in fetch(website, letter_pages).find_all("a", {"class": "a critic-authors__name"}):
+            href_critic = a['href']
+            if str(href_critic)[:7] != "/source":
+                critics_url.append(href_critic + "/movies")
         print('\r1/4 — {:.2%} of movie critic URLs scraped.'.format(ix/len(catalog)), end='   ')
     print('\r{} pages of movie critic URLs successfully scraped.'.format(ix), end='  '); print()
     return critics_url
@@ -61,8 +71,7 @@ def movies(catalog):
             errors += 1
         print('\r2/4 — {:.2%} of movie URLs scraped. Error rate: {:.2%}'.format(ix/len(catalog),
                                         errors/ix), end='   ')
-    print('\r{} movie URLs successfully scraped. Error rate: {:.2%}'.format(
-        len(movies_url)-errors, errors/ix), end='\n')
+    print('\r{} movie URLs successfully scraped. Error rate: {:.2%}'.format(len(movies_url)-errors, errors/ix), end='\n')
     return movies_url
 
 
