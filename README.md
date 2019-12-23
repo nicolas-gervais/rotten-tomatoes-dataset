@@ -1,3 +1,4 @@
+## Welcome
 The webscraper should run without error. If it crashes _for any reason other than you forgot to set the directory_, it means that Rotten Tomatoes developers have once again changed the website configuration. If this is the case, __open an issue to notify me__ (instructions [here](https://help.github.com/en/github/managing-your-work-on-github/creating-an-issue)).
 ## Instructions
 1. Current maintained version (revamp in Nov 2019, edited 23 Dec 2019): [scraping all critic reviews from rotten tomatoes](https://github.com/nicolas-gervais/6-607-Algorithms-for-Big-Data-Analysis/blob/master/scraping%20all%20critic%20reviews%20from%20rotten%20tomatoes)
