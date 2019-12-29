@@ -1,6 +1,5 @@
 """
-This webscraper should work perfectly. All you need to do is
-choose your own directory in os.chdir(). If there are any
+This webscraper should work perfectly. If there are any
 errors while you run the code, it's most likely because
 Rotten Tomatoes keeps modifying their website structure,
 probably because they detected widespread use of this web
@@ -8,7 +7,6 @@ scraper. If there are ANY errors while you run it, open
 an issue following these steps to notify me:
 https://help.github.com/en/github/managing-your-work-on-github/creating-an-issue
 """
-
 import bs4 as bs
 from urllib.request import Request, urlopen
 import pandas as pd
@@ -16,7 +14,13 @@ from string import ascii_letters
 import numpy as np
 import os
 
-os.chdir('c:/users/nicolas/documents/data/rottentomatoes/v2')
+
+newfolder = 'rottentomatoes'
+
+if not os.path.isdir(newfolder):
+    os.mkdir(newfolder)
+
+os.chdir(newfolder)
 
 website = "https://www.rottentomatoes.com"
 alphabet = ascii_letters[:26].replace('x', '')  # remove x
